@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>동대문2정보통신관리소 장비관리</title>
+    <style>
+        :root { --bg-color: #f4f7f6; --primary-color: #2c3e50; --btn-color: #3498db; --print-btn-color: #27ae60; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; }
+        
+        /* 헤더 스타일 */
+        .header { background: var(--primary-color); color: white; padding: 15px; text-align: center; position: relative; }
+        .refresh-btn { position: absolute; right: 15px; top: 15px; background: none; border: 1px solid white; color: white; cursor: pointer; border-radius: 4px; padding: 5px 10px; }
+        
+        .container { padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        
+        /* 버튼 및 카드 스타일 */
+        .item-btn { width: 100%; max-width: 400px; padding: 20px; font-size: 18px; border: none; border-radius: 8px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; text-align: left; transition: 0.2s; }
+        .item-btn:active { background: #e0e0e0; }
+        
+        .detail-card { width: 100%; max-width: 400px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; box-sizing: border-box; }
+        .info-row { margin: 15px 0; font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; text-align: left; }
+        .label { font-size: 14px; color: #888; display: block; margin-bottom: 5px; }
+        
+        /* 내비게이션 및 인쇄 버튼 */
+        .nav-bar { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 400px; }
+        .nav-btn { flex: 1; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .back-btn { background: #95a5a6; color: white; }
+        .home-btn { background: var(--btn-color); color: white; }
+        .print-btn { width: 100%; max-width: 400px; margin-top: 10px; padding: 15px; background: var(--print-btn-color); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+
+        /* [인쇄 전용 스타일] 인쇄 시 버튼들 숨김 */
+        @media print {
+            .header, .refresh-btn, .nav-bar, .print-btn { display: none !important; }
+            body { background: white; }
+            .container { padding: 0; }
+            .detail-card { border: 1px solid #ccc; box-shadow: none; max-width: 100%; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <span id="view-title">장비 관리 시스템</span>
+    <button class="refresh-btn" onclick="location.reload()">🔄 리플레시</button>
+</div>
+
+<div id="app" class="container"></div>
+
+<script>
+    // 입력하신 데이터 반영
+    const deviceData = {
+        "화상망": {
+            "3D 맵": { "id": "admindongdaemun", "pw": "a1234" },
+            "FMS": { "id": "admindongdaemun", "pw": "!123456789q" },
+            "L3 SW": { "id": "admin", "pw": "admin!l3fs21" },
+            "L2 SW": { "id": "admin", "pw": "admin!l2poes21" },
+            "NAC(화상망)": { "id": "dongdaemun2", "pw": "SeoulMetro!4" },
+            "ITV 카메라 및 디코더": { "id": "admin", "pw": "SeoulMetro!4" },
+            "일반카메라": { "id": "admin", "pw": "1234qwer" },
+            "역사교환기": { "id": "admin", "pw": "qufrhks@8787" },
+            "영상운영(NVR)": { "id": "통신관리소(동대문2)", "pw": "SeoulMetro14!" }
+        },
+        "IP-교환기": {
+            "IP교환기": { "id": "admin1", "pw": "qufrhks8787" }
+        },
+        "IP-MPLS": {
+            "NMS(U2000)": { "id": "Dannex", "pw": "@뼐관2222" },
+            "TNMS": { "id": "dongdaemun2", "pw": "별관@5678" },
+            "역사장치": { "id": "seoulmetro1234", "pw": "IP@MPLS8800" },
+            "광정류기": { "id": "dongdaemun2", "pw": "별관@1234" },
+            "클럽공급장치": { "id": "dongdaemun", "pw": "8787" },
+            "콘솔접속": { "id": "없음", "pw": "1-4Metro" }
+        },
+        "LTE-R": {
+            "TNMS": { "id": "dongdaemun2", "pw": "별관@8787" },
+            "EMS-R": { "id": "dongdaemun2", "pw": "Metro123$" },
+            "TNMS 운영현황(DU, RU 장애유뮤표시)": { "id": "없음", "pw": "없음" },
+            "무선방송연동장치": { "id": "동대문2", "pw": "1234" }
+        },
+        "통합망": {
+            "NMS": { "id": "admin34", "pw": "1234" },
+            "NAC": { "id": "db4", "pw": "별관@1234" },
+            "9700/6850": { "id": "admin", "pw": "Seoulmetro1234#" }
+        },
+        "인터넷망": {
+            "NMS": { "id": "dongdaemun4", "pw": "#metro1_4#" },
+            "NAC": { "id": "db4", "pw": "별관@1234" },
+            "L2, L3 SW": { "id": "admin", "pw": "Switch12#$" },
+            "L2 SW(별관통신기계실용)": { "id": "admin", "pw": "Seoulmetro1234#" },
+            "L2 (IP교환기용_알카텔)": { "id": "admin", "pw": "Switch12#$" },
+            "L2 (IP교환기용_노텔)": { "id": "PO", "pw": "user" },
+            "Voip L2 SW": { "id": "admin", "pw": "Switch12#$" },
+            "IP교환기용 방화벽_MF2": { "id": "fwadm1", "pw": "보안00!!" },
+            "IP교환기용 방화벽_CLI": { "id": "root", "pw": "secui00@! OR 보안82@!" }
+        },
+        "UPS/BMS": {
+            "UPS": { "id": "없음", "pw": "없음" },
+            "BMS(성화)": { "id": "user", "pw": "1234" },
+            "BMS(IPSYS)": { "id": "administrator", "pw": "0000" }
+        },
+        "터널방송/방송장치": {
+            "터널방송": { "id": "동대문역사문화", "pw": "1111" },
+            "방송장치 모니터링": { "id": "없음", "pw": "없음" },
+            "teamviewer": { "id": "해당역IP", "pw": "123123" },
+            "VNC viewer": { "id": "해당역IP", "pw": "1234" }
+        }
+    };
+
+    let currentView = 'home';
+    let selectedCategory = '';
+    let selectedDevice = '';
+
+    const app = document.getElementById('app');
+    const viewTitle = document.getElementById('view-title');
+
+    function render() {
+        app.innerHTML = '';
+        
+        if (currentView === 'home') {
+            viewTitle.innerText = "동대문2정보통신관리소";
+            Object.keys(deviceData).forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'item-btn';
+                btn.innerText = '📁 ' + cat;
+                btn.onclick = () => { selectedCategory = cat; currentView = 'category'; render(); };
+                app.appendChild(btn);
+            });
+        } 
+        else if (currentView === 'category') {
+            viewTitle.innerText = selectedCategory;
+            Object.keys(deviceData[selectedCategory]).forEach(dev => {
+                const btn = document.createElement('button');
+                btn.className = 'item-btn';
+                btn.innerText = '🛠️ ' + dev;
+                btn.onclick = () => { selectedDevice = dev; currentView = 'detail'; render(); };
+                app.appendChild(btn);
+            });
+            addNavButtons(false);
+        } 
+        else if (currentView === 'detail') {
+            viewTitle.innerText = selectedDevice;
+            const data = deviceData[selectedCategory][selectedDevice];
+            
+            const card = document.createElement('div');
+            card.className = 'detail-card';
+            card.innerHTML = `
+                <div style="font-size:12px; color:#888; margin-bottom:5px;">${selectedCategory}</div>
+                <div style="font-size:20px; font-weight:bold; margin-bottom:20px;">${selectedDevice}</div>
+                <div class="info-row"><span class="label">ID</span><strong>${data.id}</strong></div>
+                <div class="info-row"><span class="label">PASSWORD</span><strong>${data.pw}</strong></div>
+            `;
+            app.appendChild(card);
+
+            // 인쇄 버튼 추가
+            const printBtn = document.createElement('button');
+            printBtn.className = 'print-btn';
+            printBtn.innerText = '🖨️ 현재 정보 인쇄';
+            printBtn.onclick = () => { window.print(); };
+            app.appendChild(printBtn);
+
+            addNavButtons(true);
+        }
+    }
+
+    function addNavButtons(showHome) {
+        const navBar = document.createElement('div');
+        navBar.className = 'nav-bar';
+        
+        const backBtn = document.createElement('button');
+        backBtn.className = 'nav-btn back-btn';
+        backBtn.innerText = '⬅ 뒤로가기';
+        backBtn.onclick = () => {
+            if (currentView === 'detail') currentView = 'category';
+            else if (currentView === 'category') currentView = 'home';
+            render();
+        };
+        navBar.appendChild(backBtn);
+
+        if (showHome) {
+            const homeBtn = document.createElement('button');
+            homeBtn.className = 'nav-btn home-btn';
+            homeBtn.innerText = '🏠 홈으로';
+            homeBtn.onclick = () => { currentView = 'home'; render(); };
+            navBar.appendChild(homeBtn);
+        }
+        app.appendChild(navBar);
+    }
+
+    render();
+</script>
+
+</body>
+</html>
