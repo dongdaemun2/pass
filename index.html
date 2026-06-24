@@ -10,7 +10,34 @@
         
         /* 헤더 스타일 */
         .header { background: var(--primary-color); color: white; padding: 15px; text-align: center; position: relative; }
-        .refresh-btn { position: absolute; right: 15px; top: 15px; background: none; border: 1px solid white; color: white; cursor: pointer; border-radius: 4px; padding: 5px 10px; }
+        .header-buttons { position: absolute; right: 15px; top: 15px; display: flex; gap: 8px; }
+        .refresh-btn, .patch-btn { background: none; border: 1px solid white; color: white; cursor: pointer; border-radius: 4px; padding: 5px 10px; }
+        .patch-popup {
+            display: none;
+            position: fixed;
+            top: 60px;
+            right: 15px;
+            width: 320px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: white;
+            color: #222;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+            z-index: 999;
+            padding: 15px;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .patch-popup h3 { margin-top: 0; margin-bottom: 10px; color: var(--primary-color); }
+        .patch-item { border-bottom: 1px solid #ddd; padding: 8px 0; font-size: 14px; line-height: 1.5; }
+        .patch-item:last-child { border-bottom: none; }
+        .patch-close { float: right; border: none; background: #eee; border-radius: 4px; cursor: pointer; padding: 3px 7px; }
+        @media (max-width: 520px) {
+            .header { padding-top: 55px; }
+            .header-buttons { left: 15px; right: 15px; justify-content: center; }
+            .patch-popup { left: 15px; right: 15px; width: auto; }
+        }
         
         .container { padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
         
@@ -31,7 +58,7 @@
 
         /* [인쇄 전용 스타일] 인쇄 시 버튼들 숨김 */
         @media print {
-            .header, .refresh-btn, .nav-bar, .print-btn { display: none !important; }
+            .header, .refresh-btn, .patch-btn, .patch-popup, .nav-bar, .print-btn { display: none !important; }
             body { background: white; }
             .container { padding: 0; }
             .detail-card { border: 1px solid #ccc; box-shadow: none; max-width: 100%; width: 100%; }
@@ -42,15 +69,37 @@
 
 <div class="header">
     <span id="view-title">장비 관리 시스템</span>
-    <button class="refresh-btn" onclick="location.reload()">🔄 리플레시</button>
+    <div class="header-buttons">
+        <button class="patch-btn" onclick="togglePatchNotes()">📋 패치내역</button>
+        <button class="patch-btn" onclick="adminLogin()">⚙ 관리자</button>
+        <button class="refresh-btn" onclick="location.reload()">🔄 리플레시</button>
+    </div>
+</div>
+
+<div id="patchPopup" class="patch-popup">
+    <button class="patch-close" onclick="togglePatchNotes(false)">닫기</button>
+    <h3>📋 패치내역</h3>
+
+    <div class="patch-item">
+        <strong>2026.06.23</strong><br>
+        - 우측 상단 패치내역 버튼 추가<br>
+        - 패치내역 팝업 인터페이스 추가
+    </div>
+
+    <div class="patch-item">
+        <strong>2026.06.04</strong><br>
+        - 장비관리 HTML 파일 기준 통합본<br>
+        - 인쇄 기능 및 홈 이동 기능 유지
+    </div>
 </div>
 
 <div id="app" class="container"></div>
 
 <script>
     // 입력하신 데이터 반영
-    const deviceData = {
-        "화상망": {
+
+    const defaultDeviceData = {
+        "화상망/EMS(안내게시기)": {
             "3D 맵": { "id": "admindongdaemun", "pw": "a1234" },
             "FMS": { "id": "admindongdaemun", "pw": "!123456789q" },
             "L3 SW": { "id": "admin", "pw": "admin!l3fs21" },
@@ -59,7 +108,8 @@
             "ITV 카메라 및 디코더": { "id": "admin", "pw": "SeoulMetro!4" },
             "일반카메라": { "id": "admin", "pw": "1234qwer" },
             "역사교환기": { "id": "admin", "pw": "qufrhks@8787" },
-            "영상운영(NVR)": { "id": "통신관리소(동대문2)", "pw": "SeoulMetro14!" }
+            "영상운영(NVR)": { "id": "통신관리소(동대문2)", "pw": "SeoulMetro14!" },
+	    "EMS(안내게시기)": { "id": "dongdaemoon2", "pw": "moon123!@#" }
         },
         "IP-교환기": {
             "IP교환기": { "id": "admin1", "pw": "qufrhks8787" }
@@ -105,14 +155,155 @@
             "teamviewer": { "id": "해당역IP", "pw": "123123" },
             "VNC viewer": { "id": "해당역IP", "pw": "1234" }
         }
+
     };
 
-    let currentView = 'home';
+    
+    
+    let patchNotes = JSON.parse(localStorage.getItem('patchNotes')) || [
+        { date: "2026.06.23", text: "우측 상단 패치내역 버튼 추가" },
+        { date: "2026.06.23", text: "관리자 모드 추가" },
+        { date: "2026.06.23", text: "localStorage 저장 기능 추가" }
+    ];
+
+    function savePatchNotes() {
+        localStorage.setItem('patchNotes', JSON.stringify(patchNotes));
+    }
+
+    function renderPatchNotes() {
+        const popup = document.getElementById('patchPopup');
+        popup.innerHTML = '<button class="patch-close" onclick="togglePatchNotes(false)">닫기</button><h3>📋 패치내역</h3>';
+
+        patchNotes.forEach(note => {
+            popup.innerHTML += `
+                <div class="patch-item">
+                    <strong>${note.date}</strong><br>
+                    - ${note.text}
+                </div>
+            `;
+        });
+    }
+
+    function addPatchNote() {
+        const text = prompt("추가할 패치 내용을 입력하세요");
+        if (!text) return;
+
+        const today = new Date();
+        const date = `${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
+
+        patchNotes.unshift({ date, text });
+        savePatchNotes();
+        renderPatchNotes();
+
+        alert("패치내역 추가 완료");
+    }
+
+
+    function managePatchNotes() {
+        const mode = prompt(
+            "패치내역 관리\n1. 패치내역 추가\n2. 기존 패치내역 수정\n3. 기존 패치내역 삭제\n번호 입력"
+        );
+
+        if (mode === "1") addPatchNote();
+        else if (mode === "2") editPatchNote();
+        else if (mode === "3") deletePatchNote();
+    }
+
+    function getPatchNoteListText() {
+        if (patchNotes.length === 0) return "등록된 패치내역이 없습니다.";
+
+        return patchNotes.map((note, index) => {
+            return `${index + 1}. [${note.date}] ${note.text}`;
+        }).join("\n");
+    }
+
+    function editPatchNote() {
+        if (patchNotes.length === 0) {
+            alert("수정할 패치내역이 없습니다.");
+            return;
+        }
+
+        const selected = prompt("수정할 패치내역 번호를 입력하세요\n\n" + getPatchNoteListText());
+        const index = Number(selected) - 1;
+
+        if (isNaN(index) || index < 0 || index >= patchNotes.length) {
+            alert("잘못된 번호입니다.");
+            return;
+        }
+
+        const newDate = prompt("날짜 수정", patchNotes[index].date);
+        if (!newDate) return;
+
+        const newText = prompt("내용 수정", patchNotes[index].text);
+        if (!newText) return;
+
+        patchNotes[index] = { date: newDate, text: newText };
+        savePatchNotes();
+        renderPatchNotes();
+
+        alert("패치내역 수정 완료");
+    }
+
+    function deletePatchNote() {
+        if (patchNotes.length === 0) {
+            alert("삭제할 패치내역이 없습니다.");
+            return;
+        }
+
+        const selected = prompt("삭제할 패치내역 번호를 입력하세요\n\n" + getPatchNoteListText());
+        const index = Number(selected) - 1;
+
+        if (isNaN(index) || index < 0 || index >= patchNotes.length) {
+            alert("잘못된 번호입니다.");
+            return;
+        }
+
+        if (!confirm(`[${patchNotes[index].date}] ${patchNotes[index].text}\n\n이 패치내역을 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        patchNotes.splice(index, 1);
+        savePatchNotes();
+        renderPatchNotes();
+
+        alert("패치내역 삭제 완료");
+    }
+
+let deviceData = JSON.parse(localStorage.getItem('deviceData')) || JSON.parse(JSON.stringify(defaultDeviceData));
+
+    function saveData() {
+        localStorage.setItem('deviceData', JSON.stringify(deviceData));
+    }
+
+    function resetData() {
+        if (confirm("원본 데이터로 초기화하시겠습니까?")) {
+            deviceData = JSON.parse(JSON.stringify(defaultDeviceData));
+            saveData();
+            alert("초기화 완료");
+            render();
+        }
+    }
+
+let currentView = 'home';
     let selectedCategory = '';
     let selectedDevice = '';
 
     const app = document.getElementById('app');
     const viewTitle = document.getElementById('view-title');
+
+    function togglePatchNotes(forceState) {
+        const popup = document.getElementById('patchPopup');
+        if (typeof forceState === 'boolean') {
+            popup.style.display = forceState ? 'block' : 'none';
+        } else {
+            if (popup.style.display === 'block') {
+            popup.style.display = 'none';
+        } else {
+            renderPatchNotes();
+            popup.style.display = 'block';
+        }
+        }
+    }
 
     function render() {
         app.innerHTML = '';
@@ -173,7 +364,81 @@
         backBtn.onclick = () => {
             if (currentView === 'detail') currentView = 'category';
             else if (currentView === 'category') currentView = 'home';
-            render();
+        
+    const ADMIN_PASSWORD = "별관@1234";
+
+    function adminLogin() {
+        const pw = prompt("관리자 비밀번호 입력");
+        if (pw !== ADMIN_PASSWORD) {
+            alert("비밀번호가 틀렸습니다.");
+            return;
+        }
+
+        const mode = prompt(
+            "관리자 모드\n1. 장비 추가\n2. 장비 수정\n3. 장비 삭제\n4. 패치내역 관리\n번호 입력"
+        );
+
+        if (mode === "1") addDevice();
+        else if (mode === "2") editDevice();
+        else if (mode === "3") deleteDevice();
+        else if (mode === "4") managePatchNotes();
+    }
+
+    function addDevice() {
+        const category = prompt("카테고리 입력");
+        const device = prompt("장비명 입력");
+        const id = prompt("ID 입력");
+        const pw = prompt("PW 입력");
+
+        if (!deviceData[category]) deviceData[category] = {};
+        deviceData[category][device] = { id, pw };
+
+        saveData();
+        alert("추가 완료");
+        render();
+    }
+
+    function editDevice() {
+        const category = prompt("수정할 카테고리 입력");
+        const device = prompt("수정할 장비명 입력");
+
+        if (!deviceData[category] || !deviceData[category][device]) {
+            alert("장비를 찾을 수 없습니다.");
+            return;
+        }
+
+        const id = prompt("새 ID", deviceData[category][device].id);
+        const pw = prompt("새 PW", deviceData[category][device].pw);
+
+        deviceData[category][device] = { id, pw };
+
+        saveData();
+        alert("수정 완료");
+        render();
+    }
+
+    function deleteDevice() {
+        const category = prompt("삭제할 카테고리 입력");
+        const device = prompt("삭제할 장비명 입력");
+
+        if (!deviceData[category] || !deviceData[category][device]) {
+            alert("장비를 찾을 수 없습니다.");
+            return;
+        }
+
+        delete deviceData[category][device];
+
+        if (Object.keys(deviceData[category]).length === 0) {
+            delete deviceData[category];
+        }
+
+        saveData();
+        alert("삭제 완료");
+        render();
+    }
+
+
+    render();
         };
         navBar.appendChild(backBtn);
 
@@ -186,6 +451,80 @@
         }
         app.appendChild(navBar);
     }
+
+
+    const ADMIN_PASSWORD = "별관@1234";
+
+    function adminLogin() {
+        const pw = prompt("관리자 비밀번호 입력");
+        if (pw !== ADMIN_PASSWORD) {
+            alert("비밀번호가 틀렸습니다.");
+            return;
+        }
+
+        const mode = prompt(
+            "관리자 모드\n1. 장비 추가\n2. 장비 수정\n3. 장비 삭제\n4. 패치내역 관리\n번호 입력"
+        );
+
+        if (mode === "1") addDevice();
+        else if (mode === "2") editDevice();
+        else if (mode === "3") deleteDevice();
+        else if (mode === "4") managePatchNotes();
+    }
+
+    function addDevice() {
+        const category = prompt("카테고리 입력");
+        const device = prompt("장비명 입력");
+        const id = prompt("ID 입력");
+        const pw = prompt("PW 입력");
+
+        if (!deviceData[category]) deviceData[category] = {};
+        deviceData[category][device] = { id, pw };
+
+        saveData();
+        alert("추가 완료");
+        render();
+    }
+
+    function editDevice() {
+        const category = prompt("수정할 카테고리 입력");
+        const device = prompt("수정할 장비명 입력");
+
+        if (!deviceData[category] || !deviceData[category][device]) {
+            alert("장비를 찾을 수 없습니다.");
+            return;
+        }
+
+        const id = prompt("새 ID", deviceData[category][device].id);
+        const pw = prompt("새 PW", deviceData[category][device].pw);
+
+        deviceData[category][device] = { id, pw };
+
+        saveData();
+        alert("수정 완료");
+        render();
+    }
+
+    function deleteDevice() {
+        const category = prompt("삭제할 카테고리 입력");
+        const device = prompt("삭제할 장비명 입력");
+
+        if (!deviceData[category] || !deviceData[category][device]) {
+            alert("장비를 찾을 수 없습니다.");
+            return;
+        }
+
+        delete deviceData[category][device];
+
+        if (Object.keys(deviceData[category]).length === 0) {
+            delete deviceData[category];
+        }
+
+        saveData();
+        alert("삭제 완료");
+        render();
+    }
+
 
     render();
 </script>
